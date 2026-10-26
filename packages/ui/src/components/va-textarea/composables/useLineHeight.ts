@@ -1,20 +1,36 @@
 import { Ref, ref, watch } from 'vue'
 import { useResizeObserver } from '../../../composables'
 
+const getContentWidth = (textarea: HTMLTextAreaElement) => {
+  const style = window.getComputedStyle(textarea)
+  const paddingLeft = parseFloat(style.paddingLeft) || 0
+  const paddingRight = parseFloat(style.paddingRight) || 0
+
+  return Math.max(0, textarea.clientWidth - paddingLeft - paddingRight)
+}
+
 const makeTextElement = (textarea: HTMLTextAreaElement) => {
   const div = document.createElement('div')
+  const style = window.getComputedStyle(textarea)
+
   div.style.position = 'absolute'
   div.style.top = '0'
   div.style.left = '0'
-  div.style.width = 'auto'
-  const { font } = window.getComputedStyle(textarea)
-  div.style.font = font
-  div.textContent = 'Vuestic'
+  div.style.width = `${getContentWidth(textarea)}px`
+  div.style.boxSizing = 'content-box'
+  div.style.font = style.font
+  div.style.lineHeight = style.lineHeight
+  div.style.letterSpacing = style.letterSpacing
+  div.style.whiteSpace = 'pre-wrap'
+  div.style.overflowWrap = 'anywhere'
+  div.style.wordBreak = style.wordBreak
+  div.style.padding = '0'
+  div.style.margin = '0'
   div.style.zIndex = '-1'
   div.style.pointerEvents = 'none'
   div.style.opacity = '0'
   div.ariaHidden = 'true'
-  div.innerText = textarea.value
+  div.textContent = textarea.value
 
   return div
 }
@@ -34,10 +50,16 @@ export const useTextHeight = (textarea: Ref<HTMLTextAreaElement | undefined>, te
     }
   })
 
-  useResizeObserver(textElement, (newElement) => {
-    if (!newElement || !textarea.value) { return }
+  useResizeObserver([textElement, textarea], (entries) => {
+    for (const entry of entries) {
+      if (entry.target === textElement.value) {
+        textHeight.value = entry.contentRect.height
+      }
 
-    textHeight.value = newElement[0].contentRect.height
+      if (entry.target === textarea.value && textElement.value) {
+        textElement.value.style.width = `${getContentWidth(textarea.value)}px`
+      }
+    }
   })
 
   watch(text, (newText) => {
